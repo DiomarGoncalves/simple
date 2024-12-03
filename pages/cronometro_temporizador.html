@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cronômetro e Temporizador</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            margin: 50px auto;
+            width: 400px;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .time-display {
+            font-size: 32px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+
+        .input {
+            width: 80%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        .button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cronômetro e Temporizador</h1>
+        <div>
+            <h2>Cronômetro</h2>
+            <div class="time-display" id="stopwatchDisplay">00:00:00</div>
+            <button class="button" onclick="startStopwatch()">Iniciar</button>
+            <button class="button" onclick="stopStopwatch()">Parar</button>
+            <button class="button" onclick="resetStopwatch()">Zerar</button>
+        </div>
+        <hr>
+        <div>
+            <h2>Temporizador</h2>
+            <input type="number" id="timerInput" class="input" placeholder="Digite os segundos" />
+            <div class="time-display" id="timerDisplay">00:00:00</div>
+            <button class="button" onclick="startTimer()">Iniciar</button>
+            <button class="button" onclick="resetTimer()">Zerar</button>
+        </div>
+    </div>
+
+    <script>
+        // Cronômetro
+        let stopwatchInterval;
+        let stopwatchTime = 0;
+
+        function startStopwatch() {
+            if (stopwatchInterval) return;
+            stopwatchInterval = setInterval(() => {
+                stopwatchTime++;
+                document.getElementById('stopwatchDisplay').textContent = formatTime(stopwatchTime);
+            }, 1000);
+        }
+
+        function stopStopwatch() {
+            clearInterval(stopwatchInterval);
+            stopwatchInterval = null;
+        }
+
+        function resetStopwatch() {
+            stopStopwatch();
+            stopwatchTime = 0;
+            document.getElementById('stopwatchDisplay').textContent = formatTime(stopwatchTime);
+        }
+
+        // Temporizador
+        let timerInterval;
+        let timerTime = 0;
+
+        function startTimer() {
+            const inputTime = parseInt(document.getElementById('timerInput').value);
+            if (isNaN(inputTime) || inputTime <= 0) {
+                alert('Por favor, insira um valor válido para os segundos!');
+                return;
+            }
+
+            timerTime = inputTime;
+            document.getElementById('timerDisplay').textContent = formatTime(timerTime);
+
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (timerTime <= 0) {
+                    clearInterval(timerInterval);
+                    alert('O tempo acabou!');
+                } else {
+                    timerTime--;
+                    document.getElementById('timerDisplay').textContent = formatTime(timerTime);
+                }
+            }, 1000);
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerTime = 0;
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            document.getElementById('timerInput').value = '';
+        }
+
+        // Formatar tempo para HH:MM:SS
+        function formatTime(seconds) {
+            const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+            const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+            const secs = String(seconds % 60).padStart(2, '0');
+            return `${hrs}:${mins}:${secs}`;
+        }
+    </script>
+</body>
+</html>
