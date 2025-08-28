@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini Leitor de JSON</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#0f1724; --accent:#7dd3fc; --muted:#94a3b8; --error:#fb7185;
+    --panel:#071025; --glass: rgba(255,255,255,0.03);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  }
+  html,body{height:100%; margin:0; background:linear-gradient(180deg,var(--bg),#021026); color:#e6eef6;}
+  .wrap{max-width:1100px;margin:28px auto;padding:20px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent); box-shadow:0 8px 30px rgba(2,6,23,0.6);}
+  h1{margin:0 0 8px;font-size:20px;}
+  p.lead{margin:0 0 18px;color:var(--muted);}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  button, .file-btn{background:transparent;border:1px solid rgba(125,211,252,0.12);padding:10px 12px;border-radius:8px;color:var(--accent);cursor:pointer}
+  button:hover, .file-btn:hover{background:var(--glass)}
+  .file-area{flex:1;display:flex;gap:10px;align-items:center}
+  input[type="file"]{display:none}
+  .dropzone{
+    flex:1; min-height:84px;border:2px dashed rgba(125,211,252,0.08);border-radius:10px;padding:12px;display:flex;align-items:center;justify-content:center;
+    background: linear-gradient(90deg, rgba(125,211,252,0.01), transparent);
+    color:var(--muted); text-align:center;
+  }
+  .main{display:grid;grid-template-columns: 1fr 420px;gap:16px;}
+  .panel{background:var(--card);padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+  textarea{width:100%;height:520px;background:#001220;border-radius:8px;border:1px solid rgba(255,255,255,0.03);color:#e6f0ff;padding:12px;font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace;font-size:13px;resize:vertical;}
+  .side{display:flex;flex-direction:column;height:520px; gap:12px;}
+  .info{font-size:13px;color:var(--muted)}
+  .actions{display:flex;gap:8px;flex-wrap:wrap}
+  .status{margin-top:6px;font-size:13px}
+  .error{color:var(--error)}
+  .tree{overflow:auto;height:340px;padding:8px;background:#02131a;border-radius:8px;border:1px solid rgba(255,255,255,0.02);font-family: Inter, system-ui;font-size:13px;color:#dff6ff}
+  .node{padding-left:10px;line-height:1.55}
+  .key{color:#ffd580}
+  .val-string{color:#a7f3d0}
+  .val-number{color:#fca5a5}
+  .val-boolean{color:#fef08a}
+  .val-null{color:#9ca3af;font-style:italic}
+  .small{font-size:12px;color:var(--muted)}
+  .bottom{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+  .download{background:linear-gradient(90deg,#0369a1,#7dd3fc);border:none;color:#04202b;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.03);color:var(--muted)}
+  .controls-right{display:flex;gap:8px}
+  .toggle{display:inline-flex;align-items:center;gap:8px}
+  code.kv{background:rgba(255,255,255,0.02);padding:2px 6px;border-radius:4px;font-family:monospace}
+  footer{margin-top:14px;font-size:12px;color:var(--muted)}
+  @media(max-width:980px){
+    .main{grid-template-columns:1fr; }
+    textarea{height:360px}
+    .side{height:auto}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <h1>Mini Leitor / Validador de JSON</h1>
+    <p class="lead">Carregue um arquivo JSON, cole seu conteúdo ou edite no campo. Valide, formate, veja em árvore e baixe.</p>
+
+    <div class="controls" aria-hidden="false">
+      <label class="file-area panel" for="fileInput" style="cursor:pointer">
+        <input id="fileInput" type="file" accept=".json,application/json" />
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <strong style="color:var(--accent)">Carregar arquivo JSON</strong>
+          <span class="small">Clique aqui ou arraste um arquivo .json para dentro do campo abaixo</span>
+        </div>
+      </label>
+
+      <div style="flex:1">
+        <div id="dropzone" class="dropzone panel" tabindex="0" aria-label="Área de arrastar e soltar JSON">
+          Arraste e solte seu arquivo JSON aqui — ou use o botão "Abrir exemplo"
+        </div>
+      </div>
+
+      <div class="controls-right">
+        <button id="openSample" title="Carregar exemplo">Abrir exemplo</button>
+        <button id="clearAll" class="btn-ghost" title="Limpar">Limpar</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="panel">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <strong>Editor JSON</strong>
+          <span class="small" style="margin-left:6px;color:var(--muted)">Edite livremente — use Formatar/Minificar antes de validar.</span>
+        </div>
+
+        <textarea id="editor" placeholder='Cole JSON aqui ou carregue um arquivo...' aria-label="Editor de JSON"></textarea>
+
+        <div class="bottom">
+          <div class="actions">
+            <button id="validateBtn">Validar</button>
+            <button id="formatBtn">Formatar (Prettify)</button>
+            <button id="minifyBtn">Minificar</button>
+            <button id="treeBtn">Ver Árvore</button>
+            <button id="downloadBtn" class="download">Baixar JSON</button>
+            <button id="copyBtn" class="file-btn">Copiar</button>
+          </div>
+          <div class="status" id="status">Nenhuma ação ainda.</div>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="panel info" id="metaPanel">
+          <div><strong>Informações</strong></div>
+          <div class="small" style="margin-top:8px">Tamanho do texto: <span id="textLen">0</span> bytes</div>
+          <div class="small">Última validação: <span id="lastValid">—</span></div>
+          <div class="small">Nós na raiz (se objeto/array): <span id="rootCount">—</span></div>
+          <div style="margin-top:8px">
+            <label class="toggle"><input type="checkbox" id="autoFormat" /> <span class="small">Formatar automaticamente ao abrir arquivo</span></label>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <strong>Visualização em árvore</strong>
+            <span class="small">Clique nos objetos/arrays para expandir</span>
+          </div>
+          <div id="tree" class="tree" aria-live="polite">Nenhum JSON carregado.</div>
+        </div>
+
+        <div class="panel">
+          <strong>Exemplo rápido</strong>
+          <pre class="small" style="background:transparent;border:none;padding:6px;margin:6px 0 0 0;color:var(--muted)">
+{
+  "nome": "Maria",
+  "idade": 29,
+  "ativo": true,
+  "tags": ["dev","javascript"],
+  "endereco": { "cidade": "SP", "cep": "01234-567" }
+}
+          </pre>
+        </div>
+      </div>
+    </div>
+
+    <footer>Feito para estudar JSON — salve este arquivo e experimente vários JSONs. ⚡</footer>
+  </div>
+
+<script>
+/*
+  Mini JSON Reader
+  - Suporta: abrir arquivo, arrastar e soltar, colar/edit, validar, formatar, minificar, árvore e download.
+  - Tudo em um arquivo, sem dependências.
+*/
+
+const fileInput = document.getElementById('fileInput');
+const dropzone = document.getElementById('dropzone');
+const editor = document.getElementById('editor');
+const validateBtn = document.getElementById('validateBtn');
+const formatBtn = document.getElementById('formatBtn');
+const minifyBtn = document.getElementById('minifyBtn');
+const treeBtn = document.getElementById('treeBtn');
+const treeEl = document.getElementById('tree');
+const status = document.getElementById('status');
+const textLen = document.getElementById('textLen');
+const lastValid = document.getElementById('lastValid');
+const rootCount = document.getElementById('rootCount');
+const downloadBtn = document.getElementById('downloadBtn');
+const copyBtn = document.getElementById('copyBtn');
+const openSample = document.getElementById('openSample');
+const clearAll = document.getElementById('clearAll');
+const autoFormat = document.getElementById('autoFormat');
+
+function setStatus(msg, isError=false){
+  status.textContent = msg;
+  status.className = isError ? 'status error' : 'status';
+}
+
+// handle file selection
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f) return;
+  readFile(f);
+});
+
+// drag & drop
+;['dragenter','dragover'].forEach(ev=>{
+  dropzone.addEventListener(ev, e=>{
+    e.preventDefault(); e.stopPropagation();
+    dropzone.style.borderColor = '#7dd3fc';
+  });
+});
+['dragleave','drop'].forEach(ev=>{
+  dropzone.addEventListener(ev, e=>{
+    e.preventDefault(); e.stopPropagation();
+    dropzone.style.borderColor = '';
+  });
+});
+dropzone.addEventListener('drop', e=>{
+  const f = e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) readFile(f);
+});
+dropzone.addEventListener('click', ()=> fileInput.click());
+
+// read file
+function readFile(file){
+  if(!file) return;
+  if(!file.type.includes('json') && !file.name.endsWith('.json')){
+    setStatus('Atenção: arquivo não parece ser JSON. Tentando abrir mesmo assim.', true);
+  } else {
+    setStatus('Carregando arquivo...');
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    editor.value = reader.result;
+    updateMeta();
+    setStatus('Arquivo carregado.');
+    if(autoFormat.checked){
+      tryFormat();
+    }
+  };
+  reader.onerror = () => setStatus('Erro ao ler arquivo.', true);
+  reader.readAsText(file, 'UTF-8');
+}
+
+// update metadata
+function updateMeta(){
+  const txt = editor.value || '';
+  textLen.textContent = new Blob([txt]).size;
+  try {
+    const parsed = JSON.parse(txt);
+    lastValid.textContent = new Date().toLocaleString();
+    const root = Array.isArray(parsed) ? parsed.length : (parsed && typeof parsed === 'object' ? Object.keys(parsed).length : '—');
+    rootCount.textContent = root;
+  } catch(e){
+    // invalid JSON
+    rootCount.textContent = '—';
+  }
+}
+
+// validate
+validateBtn.addEventListener('click', ()=>{
+  const txt = editor.value;
+  if(!txt.trim()){ setStatus('Editor vazio — cole ou carregue um JSON.', true); return; }
+  try {
+    const parsed = JSON.parse(txt);
+    lastValid.textContent = new Date().toLocaleString();
+    setStatus('JSON válido ✔');
+    renderTree(parsed);
+  } catch (err){
+    setStatus('JSON inválido: ' + err.message, true);
+  }
+  updateMeta();
+});
+
+// format (prettify)
+formatBtn.addEventListener('click', tryFormat);
+function tryFormat(){
+  try {
+    const p = JSON.parse(editor.value || '');
+    editor.value = JSON.stringify(p, null, 2);
+    setStatus('Formatado com sucesso.');
+    updateMeta();
+  } catch (e){
+    setStatus('Não foi possível formatar — JSON inválido.', true);
+  }
+}
+
+// minify
+minifyBtn.addEventListener('click', ()=>{
+  try {
+    const p = JSON.parse(editor.value || '');
+    editor.value = JSON.stringify(p);
+    setStatus('Minificado (sem espaços).');
+    updateMeta();
+  } catch (e){
+    setStatus('Não foi possível minificar — JSON inválido.', true);
+  }
+});
+
+// render tree
+treeBtn.addEventListener('click', ()=>{
+  try {
+    const p = JSON.parse(editor.value || '');
+    renderTree(p);
+    setStatus('Árvore renderizada.');
+  } catch(e){
+    setStatus('Não foi possível renderizar árvore — JSON inválido.', true);
+  }
+});
+
+function renderTree(data){
+  treeEl.innerHTML = '';
+  const root = createNode('root', data, true);
+  treeEl.appendChild(root);
+}
+
+// create DOM node recursively
+function createNode(key, value, isRoot=false){
+  const wrapper = document.createElement('div');
+  wrapper.className = 'node';
+
+  if(isRoot){
+    // don't show 'root' key, show children directly
+    if(typeof value === 'object' && value !== null){
+      if(Array.isArray(value)){
+        wrapper.appendChild(createExpandable('[array]', value));
+      } else {
+        wrapper.appendChild(createExpandable('{object}', value));
+      }
+    } else {
+      wrapper.appendChild(renderValue(key, value));
+    }
+    return wrapper;
+  }
+
+  if(typeof value === 'object' && value !== null){
+    const typeLabel = Array.isArray(value) ? `[Array:${value.length}]` : `{Object:${Object.keys(value).length}}`;
+    const exp = createExpandable(key + ' ' + typeLabel, value);
+    wrapper.appendChild(exp);
+  } else {
+    const line = document.createElement('div');
+    line.innerHTML = '<span class="key">"' + escapeHtml(key) + '"</span>: ' + renderInline(value);
+    wrapper.appendChild(line);
+  }
+  return wrapper;
+}
+
+function createExpandable(label, obj){
+  const container = document.createElement('div');
+  const header = document.createElement('div');
+  header.style.cursor = 'pointer';
+  header.style.userSelect = 'none';
+  header.style.fontWeight = '600';
+  header.textContent = label;
+  header.title = 'Clique para expandir/contrair';
+  const body = document.createElement('div');
+  body.style.display = 'none';
+  body.style.marginLeft = '10px';
+  if(Array.isArray(obj)){
+    obj.forEach((v,i)=> body.appendChild(createNode('['+i+']', v)));
+  } else {
+    Object.keys(obj).forEach(k=> body.appendChild(createNode(k, obj[k])));
+  }
+  header.addEventListener('click', ()=> {
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  });
+  container.appendChild(header);
+  container.appendChild(body);
+  return container;
+}
+
+function renderValue(key, v){
+  const el = document.createElement('div');
+  el.innerHTML = '<span class="key">"' + escapeHtml(key) + '"</span>: ' + renderInline(v);
+  return el;
+}
+
+function renderInline(v){
+  if(v === null) return '<span class="val-null">null</span>';
+  if(typeof v === 'string') return '<span class="val-string">"' + escapeHtml(v) + '"</span>';
+  if(typeof v === 'number') return '<span class="val-number">' + String(v) + '</span>';
+  if(typeof v === 'boolean') return '<span class="val-boolean">' + String(v) + '</span>';
+  return '<span class="small">' + escapeHtml(String(v)) + '</span>';
+}
+
+function escapeHtml(str){
+  return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+}
+
+// download JSON
+downloadBtn.addEventListener('click', ()=>{
+  const text = editor.value || '';
+  if(!text.trim()){ setStatus('Nada para baixar.', true); return; }
+  const blob = new Blob([text], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'data.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus('Download iniciado.');
+});
+
+// copy to clipboard
+copyBtn.addEventListener('click', async ()=>{
+  try {
+    await navigator.clipboard.writeText(editor.value || '');
+    setStatus('Conteúdo copiado para a área de transferência.');
+  } catch (e){
+    setStatus('Falha ao copiar — permissões do navegador?', true);
+  }
+});
+
+// update metadata as user types
+editor.addEventListener('input', ()=> {
+  updateMeta();
+});
+
+// sample
+openSample.addEventListener('click', ()=>{
+  const sample = `{
+  "nome": "João",
+  "idade": 34,
+  "casado": false,
+  "salarios": [3500.50, 4200, 5000],
+  "dependentes": [
+    {"nome":"Ana", "idade":6},
+    {"nome":"Rafael", "idade":3}
+  ],
+  "endereco": { "cidade": "Rio de Janeiro", "uf": "RJ" },
+  "notas": null
+}`;
+  editor.value = sample;
+  updateMeta();
+  setStatus('Exemplo carregado.');
+  renderTree(JSON.parse(sample));
+});
+
+// clear
+clearAll.addEventListener('click', ()=>{
+  editor.value = '';
+  treeEl.textContent = 'Nenhum JSON carregado.';
+  setStatus('Editor limpo.');
+  updateMeta();
+  lastValid.textContent = '—';
+});
+
+// small helpers to show current text length on load
+updateMeta();
+
+// accessibility: allow keyboard dropzone "Enter" to open file picker
+dropzone.addEventListener('keydown', (e)=> {
+  if(e.key === 'Enter' || e.key === ' ') fileInput.click();
+});
+
+// convenience: parse on Ctrl+Enter
+editor.addEventListener('keydown', (e)=>{
+  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+    validateBtn.click();
+  }
+});
+
+// initial message
+setStatus('Pronto — carregue ou cole um JSON para começar.');
+</script>
+</body>
+</html>
